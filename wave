@@ -1,0 +1,213 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # needed for 3d plotting
+from scipy.special import sph_harm, genlaguerre
+from math import factorial, sqrt
+
+# ========================
+# Hydrogen wavefunction
+# ========================
+def hydrogen_radial(n, l, r, a0=1.0):
+    """
+    Compute the radial part R_{nl}(r) of the hydrogen atom wavefunction.
+    
+    Parameters:
+      n   : Principal quantum number (n > l).
+      l   : Orbital angular momentum quantum number (0 ≤ l < n).
+      r   : Radial coordinate (can be a scalar or numpy array).
+      a0  : Bohr radius (default is 1.0 in atomic units).
+    
+    Returns:
+      R_nl(r) : The value of the radial wavefunction at r.
+    
+    The radial wavefunction is given by:
+    
+      Rₙₗ(r) = √[ (2/(na₀))³ * (n-ℓ-1)!/(2n (n+ℓ)!) ]
+               · exp[−r/(na₀)]
+               · (2r/(na₀))^ℓ · Lₙ₋ₗ₋₁^(2ℓ+1)(2r/(na₀))
+    
+    where Lₙ₋ₗ₋₁^(2ℓ+1)(x) are the associated Laguerre polynomials.
+    """
+    # Normalization constant:
+    norm = sqrt((2.0/(n*a0))**3 * factorial(n-l-1) / (2*n*factorial(n+l)))
+    # Dimensionless variable:
+    rho = 2.0 * r / (n * a0)
+    # Evaluate the associated Laguerre polynomial L_{n-l-1}^{2l+1}(rho)
+    laguerre_poly = genlaguerre(n-l-1, 2*l+1)
+    poly_val = laguerre_poly(rho)
+    # Assemble the radial part:
+    Rnl = norm * np.exp(-r/(n*a0)) * (rho**l) * poly_val
+    return Rnl
+
+def hydrogen_wavefunction(n, l, m, r, theta, phi, a0=1.0):
+    """
+    Compute the full hydrogen atom wavefunction ψₙₗₘ(r,θ,φ) = Rₙₗ(r) Yₗᵐ(θ,φ)
+    
+    Parameters:
+      n   : Principal quantum number.
+      l   : Orbital angular momentum quantum number.
+      m   : Magnetic quantum number (−l ≤ m ≤ l).
+      r   : Radial coordinate.
+      theta: Polar angle.
+      phi  : Azimuthal angle.
+      a0  : Bohr radius.
+    
+    Returns:
+      ψₙₗₘ(r,θ,φ) : The (possibly complex) value of the hydrogen wavefunction.
+    
+    Note:
+      The spherical harmonics Yₗᵐ(θ,φ) are computed using scipy.special.sph_harm.
+    """
+    Rnl = hydrogen_radial(n, l, r, a0)
+    Ylm = sph_harm(m, l, phi, theta)
+    return Rnl * Ylm
+
+# ========================
+# Utility functions
+# ========================
+def cartesian_to_spherical(pos):
+    """
+    Convert a 3D Cartesian coordinate to spherical coordinates (r, theta, phi).
+    
+    Parameters:
+      pos : A numpy array or list with three components [x, y, z].
+    
+    Returns:
+      r     : Radial distance.
+      theta : Polar angle (0 <= theta <= pi).
+      phi   : Azimuthal angle (−pi < phi <= pi).
+    """
+    x, y, z = pos
+    r = np.linalg.norm(pos)
+    if r == 0:
+        theta = 0.0
+        phi = 0.0
+    else:
+        theta = np.arccos(z/r)
+        phi = np.arctan2(y, x)
+    return r, theta, phi
+
+def find_initial_point(n, l, m, a0=1.0, max_trials=10000):
+    """
+    Find an initial point in 3D space where |ψ|^2 > 1e-10.
+    This avoids starting at nodes (where the probability density vanishes).
+    
+    Parameters:
+      n, l, m : Quantum numbers.
+      a0      : Bohr radius.
+      max_trials: Maximum number of attempts.
+    
+    Returns:
+      A numpy array [x, y, z] that can be used as the starting point.
+    """
+    for _ in range(max_trials):
+        point = np.random.uniform(-1.0, 1.0, size=3)
+        r, theta, phi = cartesian_to_spherical(point)
+        prob = np.abs(hydrogen_wavefunction(n, l, m, r, theta, phi, a0))**2
+        if prob > 1e-10:
+            return point
+    # Fallback in case a good point is not found.
+    return np.array([0.1, 0.1, 0.1])
+
+# ========================
+# Metropolis Monte Carlo
+# ========================
+def metropolis_sampling(n, l, m, num_samples=50000, step=0.5, a0=1.0):
+    """
+    Sample points from the probability density |ψₙₗₘ(r,θ,φ)|^2 using the 
+    Metropolis Monte Carlo algorithm.
+    
+    Parameters:
+      n, l, m   : Quantum numbers of the orbital.
+      num_samples: Number of samples to generate.
+      step      : Maximum displacement in each Cartesian direction for the proposal.
+      a0        : Bohr radius.
+    
+    Returns:
+      samples : A NumPy array of shape (num_samples, 3) containing Cartesian coordinates.
+    """
+    samples = []
+    # Choose an initial point where the probability is nonzero:
+    current = find_initial_point(n, l, m, a0)
+    r, theta, phi = cartesian_to_spherical(current)
+    current_prob = np.abs(hydrogen_wavefunction(n, l, m, r, theta, phi, a0))**2
+    samples.append(current.copy())
+    
+    for i in range(num_samples):
+        # Propose a move: a random displacement in a cube of side length 2*step.
+        proposal = current + np.random.uniform(-step, step, size=3)
+        r_new, theta_new, phi_new = cartesian_to_spherical(proposal)
+        new_prob = np.abs(hydrogen_wavefunction(n, l, m, r_new, theta_new, phi_new, a0))**2
+        
+        # Acceptance ratio (avoid division by zero):
+        if current_prob == 0:
+            ratio = 1.0
+        else:
+            ratio = new_prob / current_prob
+        
+        # Accept the new point with probability min(1, ratio)
+        if ratio >= 1 or np.random.rand() < ratio:
+            current = proposal
+            current_prob = new_prob
+        
+        samples.append(current.copy())
+    
+    return np.array(samples)
+
+# ========================
+# Plotting functions
+# ========================
+def plot_samples(samples, title="Orbital", n_points=5000):
+    """
+    Create a 3D scatter plot of the sampled points.
+    
+    Parameters:
+      samples : Array of shape (N,3) containing the sampled Cartesian coordinates.
+      title   : Title for the plot.
+      n_points: Number of points to plot (to avoid overcrowding).
+    """
+    # For plotting, we can randomly choose a subset of points:
+    if samples.shape[0] > n_points:
+        indices = np.random.choice(samples.shape[0], n_points, replace=False)
+        samples = samples[indices]
+    
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(samples[:,0], samples[:,1], samples[:,2], s=1, alpha=0.5)
+    ax.set_title(title)
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
+    plt.tight_layout()
+    plt.show()
+
+# ========================
+# Main demonstration
+# ========================
+def main():
+    # Choose Bohr radius (atomic units)
+    a0 = 1.0
+
+    # --------------------------
+    # Example 1: 1s orbital (n=1, l=0, m=0)
+    # --------------------------
+    print("Sampling the 1s orbital (n=1, l=0, m=0)...")
+    samples_1s = metropolis_sampling(n=1, l=0, m=0, num_samples=30000, step=0.5, a0=a0)
+    plot_samples(samples_1s, title="Hydrogen 1s orbital (n=1, l=0, m=0)")
+    
+    # --------------------------
+    # Example 2: 2s orbital (n=2, l=0, m=0)
+    # --------------------------
+    print("Sampling the 2s orbital (n=2, l=0, m=0)...")
+    samples_2s = metropolis_sampling(n=2, l=0, m=0, num_samples=30000, step=0.8, a0=a0)
+    plot_samples(samples_2s, title="Hydrogen 2s orbital (n=2, l=0, m=0)")
+    
+    # --------------------------
+    # Example 3: 2p orbital (n=2, l=1, m=0)
+    # --------------------------
+    print("Sampling the 2p orbital (n=2, l=1, m=0)...")
+    samples_2p = metropolis_sampling(n=2, l=1, m=0, num_samples=30000, step=0.8, a0=a0)
+    plot_samples(samples_2p, title="Hydrogen 2p orbital (n=2, l=1, m=0)")
+
+if __name__ == '__main__':
+    main()
