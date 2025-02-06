@@ -39,13 +39,7 @@ Here we demonstrate the **1s, 2s, and 2p orbitals** as 3D scatter plots of the s
 
 ---
 
-Below is the complete code. You can save it as (for example) **`hydrogen_metro.py`**  
-and run it (provided you have NumPy, SciPy, and Matplotlib installed).
-
-​
- (r,θ,ϕ)∣ 
-2
- 
-where proposals are made by displacing the current 3D Cartesian point. (For orbitals that vanish at the origin, the code chooses a nonzero starting point.)
 
 Plots a few examples (here we demonstrate the 1s, 2s, and 2p orbitals) as 3D scatter plots of the sampled positions.
+
+
