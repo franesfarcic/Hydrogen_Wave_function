@@ -42,5 +42,6 @@ Here we demonstrate the **1s, 2s, and 2p orbitals** as 3D scatter plots of the s
 
 Plots a few examples (here we demonstrate the 1s, 2s, and 2p orbitals) as 3D scatter plots of the sampled positions.
 ![Image](https://github.com/user-attachments/assets/85b1fca1-a727-485e-9815-ee8106a2d5ab)
-
+![Image](https://github.com/user-attachments/assets/db5b8b3c-eee8-4dcc-b8b2-64049031892d)
+![Image](https://github.com/user-attachments/assets/eeab6909-6d6d-4aac-b104-f7fa5043dc2e)
 
