@@ -41,5 +41,7 @@ Here we demonstrate the **1s, 2s, and 2p orbitals** as 3D scatter plots of the s
 
 
 Plots a few examples (here we demonstrate the 1s, 2s, and 2p orbitals) as 3D scatter plots of the sampled positions.
-![Hydrogen Wavefunction](images/wavefunction.png)
+![Hydrogen 1s orbital](images/Hydrogen 1s orbital.png)
+![Hydrogen 2s orbital](images/Hydrogen 2s orbital.png)
+![Hydrogen 2p orbital](images/Hydrogen 2p orbital.png)
 
